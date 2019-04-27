@@ -1,7 +1,10 @@
-.App{
+.app{
   text-align: center;
+  display: block;
   width: 90%;
   margin: 10px;
+  margin-left: auto;
+  margin-right: auto;
   padding: 10px;
 }
 
