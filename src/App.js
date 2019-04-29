@@ -3,18 +3,21 @@ import './App.css';
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/dist/styles/ag-grid.css';
 import 'ag-grid-community/dist/styles/ag-theme-balham.css';
+import MuiThemeProvider from 'material-ui/styles/MuiThemeProvider';
+import AppBar from 'material-ui/AppBar';
+import RaisedButton from 'material-ui/RaisedButton';
+import TextField from 'material-ui/TextField';
 
-const makeApiCall = (url, option = {}, credentials = "include") => {
+const makeApiCall = (url, option = {}, credentials) => {
   let headers = new Headers();
     headers.append('Content-Type', 'application/json');
     headers.append('accept', 'application/json');
     headers.append('Access-Control-Allow-Origin', '*');
 
-    //headers.append('Authorization', 'Basic '+ credentials);
+    headers.append('Authorization', 'Basic '+ credentials);
     headers.append('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     option = {...{
       method: "GET",
-      credentials: credentials,
       headers: headers
     }, ...option};
     let host = 'http://localhost:8080'; 
@@ -26,6 +29,7 @@ class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
+      authenticated: false,
       columnDefs: [{
         headerName: "Book Id", field: "bookId", editable: true, checkboxSelection: true
       }, {
@@ -52,18 +56,17 @@ class App extends Component {
       method: "GET"
     }
     let url = '/bookstore/logout'; 
-    makeApiCall(url, option)
+    makeApiCall(url, option, this.state.credentials)
      .then(result => {
         return result.json();
       })
      .then(resData => { 
-        alert("User Logged Out Successfully..");        
-        window.location.reload(true);
+        this.setState({authenticated: false});
       })
      .catch(error => { 
-       alert("User Logout: FAILED");
-       window.location.reload(true);
+      this.setState({authenticated: false});
        });
+
   }
   removeRow = () => {
     let selectedNodes = this.gridApi.getSelectedNodes();
@@ -72,7 +75,7 @@ class App extends Component {
       method: "DELETE"
     }
     let url = '/bookstore/removebook/' + selectedData[0].bookId; 
-    makeApiCall(url, option)
+    makeApiCall(url, option, this.state.credentials)
      .then(result => {
         return result.json();
       })
@@ -81,8 +84,23 @@ class App extends Component {
         alert("User does not have permission for this action");
        } else{
         alert(resData.errormsg);        
+        let url = '/bookstore/getbooks/bookName'; 
+          makeApiCall(url, null, this.state.credentials)
+          .then(result => {
+            if(result.status === 200){
+              return result.json();
+            }  
+            })
+          .then(rowData => {
+            if(rowData){
+              this.setState({
+                rowData: rowData
+              });
+            }            
+          })
+          .catch(error => console.error('Error:', error));
        }
-       window.location.reload(true);
+       
       })
      .catch(error => { 
        alert("Data save: FAILED");
@@ -96,15 +114,40 @@ class App extends Component {
       body: JSON.stringify(selectedData[0])
     }
     let url = '/bookstore/addbook'; 
-    makeApiCall(url, option)
+    makeApiCall(url, option, this.state.credentials)
      .then(result => {
         return result.json();
       })
      .then(resData => { 
       alert(resData.errormsg);
-      window.location.reload(true);
+      
       })
      .catch(error => { alert("Data save: FAILED") });
+  }
+  login = () => {
+    let url = '/bookstore/getbooks/bookName'; 
+    makeApiCall(url, null, btoa(this.state.username + ":" + this.state.password))
+     .then(result => {
+       if(result.status === 200){
+        return result.json();
+       } else{
+        this.setState({
+          errormsg: "Invalid user name or password."
+         });
+       }        
+      })
+     .then(rowData => {
+      if(rowData){
+        this.setState({
+          rowData: rowData,
+          authenticated: true, 
+          credentials: btoa(this.state.username + ":" + this.state.password)
+         });
+      }
+      
+    })
+     .catch(error => console.error('Error:', error));
+
   }
   updateRow = () => {
     let selectedNodes = this.gridApi.getSelectedNodes();
@@ -114,25 +157,16 @@ class App extends Component {
       body: JSON.stringify(selectedData[0])
     }
     let url = '/bookstore/updatebook'; 
-    makeApiCall(url, option)
+    makeApiCall(url, option, this.state.credentials)
      .then(result => {
         return result.json();
       })
      .then(resData => { 
       alert(resData.errormsg);
-      window.location.reload(true);
+      
       })
      .catch(error => { alert("Data save: FAILED") });
     }
-  componentDidMount(){
-    let url = '/bookstore/getbooks/bookName'; 
-    makeApiCall(url, null, this.state.credentials)
-     .then(result => {
-        return result.json();
-      })
-     .then(rowData => this.setState({rowData}))
-     .catch(error => console.error('Error:', error));
-  }
     
   render() {
     let bookStorePage = (
@@ -155,6 +189,33 @@ class App extends Component {
             onGridReady={ params => this.gridApi = params.api }>
           </AgGridReact>
       </div>);
+      if(!this.state.authenticated){
+        bookStorePage = (
+          <div>
+            <MuiThemeProvider>
+          <div>
+          <strong style={{color: "red"}}>{this.state.errormsg}</strong>
+            <br/>
+           <TextField
+             hintText="Enter your Username"
+             floatingLabelText="Username"
+             onChange = {(event,newValue) => this.setState({username:newValue})}
+             />
+           <br/>
+             <TextField
+               type="password"
+               hintText="Enter your Password"
+               floatingLabelText="Password"
+               onChange = {(event,newValue) => this.setState({password:newValue})}
+               />
+             <br/>
+             <RaisedButton label="Submit" primary={true} 
+             onClick={this.login}/>
+         </div>
+         </MuiThemeProvider>
+          </div>
+        );
+      }
     return (      
       <div>
         {bookStorePage}
