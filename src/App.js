@@ -7,6 +7,7 @@ import MuiThemeProvider from 'material-ui/styles/MuiThemeProvider';
 import AppBar from 'material-ui/AppBar';
 import RaisedButton from 'material-ui/RaisedButton';
 import TextField from 'material-ui/TextField';
+import { tsImportEqualsDeclaration } from '@babel/types';
 
 const makeApiCall = (url, option = {}, credentials) => {
   let headers = new Headers();
@@ -31,16 +32,17 @@ class App extends Component {
     this.state = {
       authenticated: false,
       columnDefs: [{
-        headerName: "Book Id", field: "bookId", editable: true, checkboxSelection: true
+        headerName: "Book Id", field: "bookId", editable: true, checkboxSelection: true, filter: "agNumberColumnFilter"
       }, {
-        headerName: "Book Name", field: "bookName", editable: true
+        headerName: "Book Name", field: "bookName", editable: true, filter: "agTextColumnFilter"
       }, {
-        headerName: "Author", field: "author", editable: true
+        headerName: "Author", field: "author", editable: true, filter: "agTextColumnFilter"
       }, {
-        headerName: "Published On", field: "dateOfPublication", editable: true
+        headerName: "Published On", field: "dateOfPublication", editable: true, filter: "agTextColumnFilter"
       }],
       rowData: []
     }
+    //this.searchBook = this.searchBook.bind(this);
   }
   addNewRow = () => {
     let newItem = {
@@ -124,8 +126,9 @@ class App extends Component {
       })
      .catch(error => { alert("Data save: FAILED") });
   }
-  login = () => {
-    let url = '/bookstore/getbooks/bookName'; 
+  getAllBook = () => {
+    let orderBy = this.state.orderBy ? this.state.orderBy : "bookId";
+    let url = '/bookstore/getbooks/' + orderBy; 
     makeApiCall(url, null, btoa(this.state.username + ":" + this.state.password))
      .then(result => {
        if(result.status === 200){
@@ -167,6 +170,28 @@ class App extends Component {
       })
      .catch(error => { alert("Data save: FAILED") });
     }
+    searchBook() {
+        let book = {
+            bookId: "",
+            bookName: "",
+            author: "",
+            dateOfPublication: ""
+        };
+        book[this.state.searchProp] = this.state.searchValue;
+        let url = '/bookstore/getbooks';
+        let option = {
+            method: "POST",
+            body: JSON.stringify(book)
+          }
+        makeApiCall(url, option, this.state.credentials)
+        .then(result => {
+            return result.json();
+        })
+        .then(resData => { 
+            this.setState({rowData: resData});        
+        });
+    }
+    
     
   render() {
     let bookStorePage = (
@@ -181,6 +206,25 @@ class App extends Component {
             <button onClick={this.updateRow}>Update Selected Row</button>
             <button onClick={this.removeRow}>Remove Selected Row</button>
             <button onClick={this.logout}>Logout</button>
+            <br/>
+            Search Book: <select name="bookDropDown" onChange={e => {this.setState({searchProp: e.target.selectedOptions[0].value})}}>
+                <option></option>
+                <option value="bookId">Book Id</option>
+                <option value="bookName">Book Name</option>
+                <option value="author">Author</option>
+                <option value="dateOfPublication">Date Of Publication</option>
+            </select>
+            <input name="bookProp" type="text" onBlur={e => {this.setState({searchValue: e.target.value})}}></input>
+            <button onClick={this.searchBook.bind(this)}>Search Book</button>
+            <br/>
+            Get All Books(Order by):<select name="bookOrderByDropDown" onChange={e => {this.setState({orderBy: e.target.selectedOptions[0].value})}}>
+                <option></option>
+                <option value="bookId">Book Id</option>
+                <option value="bookName">Book Name</option>
+                <option value="author">Author</option>
+                <option value="dateOfPublication">Date Of Publication</option>
+            </select>
+            <button onClick={this.getAllBook}>Get All Books</button>
           </div>
           <AgGridReact 
             columnDefs={this.state.columnDefs}
@@ -191,7 +235,7 @@ class App extends Component {
       </div>);
       if(!this.state.authenticated){
         bookStorePage = (
-          <div>
+          <div className="app">
             <MuiThemeProvider>
           <div>
           <strong style={{color: "red"}}>{this.state.errormsg}</strong>
@@ -210,7 +254,7 @@ class App extends Component {
                />
              <br/>
              <RaisedButton label="Submit" primary={true} 
-             onClick={this.login}/>
+             onClick={this.getAllBook}/>
          </div>
          </MuiThemeProvider>
           </div>
